@@ -18,6 +18,7 @@
 
 import urllib
 import urllib2
+import socket
 import base64
 
 import sickbeard
@@ -149,9 +150,9 @@ class PLEXNotifier:
         logger.log(u"Testing connection to the Plex Media Server host: " + host, logger.MESSAGE)
         url = "http://%s/library/sections" % host
         try:
-            xml_sections = minidom.parse(urllib.urlopen(url))
-        except IOError, e:
-            logger.log(u"Error while trying to contact Plex Media Server: " + ex(e), logger.ERROR)
+            xml_sections = minidom.parse(urllib2.urlopen(url))
+        except (urllib2.URLError, urllib2.HTTPError, socket.timeout, socket.error, IOError), e:
+            logger.log(u"Error while trying to contact Plex Media Server: " + str(e).decode('utf-8'), logger.ERROR)
             return False
         sections = xml_sections.getElementsByTagName('Directory')
         if not sections:
