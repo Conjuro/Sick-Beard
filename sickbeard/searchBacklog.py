@@ -75,6 +75,18 @@ class BacklogSearcher:
         else:
             show_list = sickbeard.showList
 
+        def titler(x):
+            if not x or sickbeard.SORT_ARTICLE:
+                return x
+            if x.lower().startswith('a '):
+                x = x[2:]
+            elif x.lower().startswith('an '):
+                x = x[3:]
+            elif x.lower().startswith('the '):
+                x = x[4:]
+            return x
+        show_list = sorted(show_list, lambda x, y: cmp(titler(x.name), titler(y.name)))
+
         if self.amActive == True:
             logger.log(u"Backlog is still running, not starting it again", logger.DEBUG)
             return
