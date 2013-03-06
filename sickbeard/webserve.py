@@ -2375,8 +2375,6 @@ class Home:
         else:
             flatten_folders = 0
 
-        logger.log(u"flatten folders: "+str(flatten_folders))
-
         if paused == "on":
             paused = 1
         else:
@@ -2411,6 +2409,7 @@ class Home:
 
             # reversed for now
             if bool(showObj.flatten_folders) != bool(flatten_folders):
+                logger.log(u"flatten folders: "+str(flatten_folders))
                 showObj.flatten_folders = flatten_folders
                 try:
                     sickbeard.showQueueScheduler.action.refreshShow(showObj) #@UndefinedVariable
