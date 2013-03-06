@@ -77,7 +77,7 @@ def sendNZB(nzb):
 
     nzbcontent64 = standard_b64encode(data)
 
-    logger.log(u"Sending NZB to NZBget")
+    logger.log(u"Sending NZB to NZBget: %s" % nzb.name)
     logger.log(u"URL: " + url, logger.DEBUG)
 
     if nzbGetRPC.append(nzb.name + ".nzb", sickbeard.NZBGET_CATEGORY, addToTop, nzbcontent64):

@@ -210,6 +210,7 @@ class BacklogQueueItem(generic_queue.QueueItem):
             search.snatchEpisode(curResult)
             time.sleep(5)
 
+        logger.log(u"Finished searching for episodes from "+self.show.name+" season "+str(self.segment))
         self.finish()
 
     def _need_any_episodes(self, statusResults, bestQualities):
