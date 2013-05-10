@@ -201,17 +201,17 @@ def pickBestResult(results, quality_list=None):
     # find the best result for the current episode
     bestResult = None
     for cur_result in results:
+        if cur_result.provider.providerType != GenericProvider.TORRENT:
+            if failed_history.hasFailed(cur_result.name):
+                logger.log(cur_result.name + u" has previously failed, rejecting it")
+                continue
+
         logger.log("Quality of "+cur_result.name+" is "+Quality.qualityStrings[cur_result.quality])
         
         if quality_list and cur_result.quality not in quality_list:
             logger.log(cur_result.name+" is a quality we know we don't want, rejecting it", logger.DEBUG)
             continue
 
-        if cur_result.provider.providerType != GenericProvider.TORRENT:
-            if failed_history.hasFailed(cur_result.name):
-                logger.log(cur_result.name + u" has previously failed, rejecting it")
-                continue
-        
         if not bestResult or bestResult.quality < cur_result.quality and cur_result.quality != Quality.UNKNOWN:
             bestResult = cur_result
         elif bestResult.quality == cur_result.quality:
