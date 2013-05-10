@@ -685,7 +685,8 @@ class ConfigGeneral:
     @cherrypy.expose
     def saveGeneral(self, log_dir=None, web_port=None, web_log=None, web_ipv6=None,
                     launch_browser=None, web_username=None, use_api=None, api_key=None,
-                    web_password=None, version_notify=None, enable_https=None, https_cert=None, https_key=None):
+                    web_password=None, version_notify=None, enable_https=None,
+                    https_cert=None, https_key=None, sort_article=None):
 
         results = []
 
@@ -709,10 +710,16 @@ class ConfigGeneral:
         else:
             version_notify = 0
 
+        if sort_article == "on":
+            sort_article = 1
+        else:
+            sort_article = 0
+
         if not config.change_LOG_DIR(log_dir):
             results += ["Unable to create directory " + os.path.normpath(log_dir) + ", log dir not changed."]
 
         sickbeard.LAUNCH_BROWSER = launch_browser
+        sickbeard.SORT_ARTICLE = sort_article
 
         sickbeard.WEB_PORT = int(web_port)
         sickbeard.WEB_IPV6 = web_ipv6
@@ -2098,17 +2105,31 @@ class Home:
         return finalResult
 
     @cherrypy.expose
-    def testPLEX(self, host=None, username=None, password=None):
+    def testPLEX(self, server_host=None, host=None, username=None, password=None):
         cherrypy.response.headers['Cache-Control'] = "max-age=0,no-cache,no-store"
 
         finalResult = ''
-        for curHost in [x.strip() for x in host.split(",")]:
-            curResult = notifiers.plex_notifier.test_notify(urllib.unquote_plus(curHost), username, password)
-            if len(curResult.split(":")) > 2 and 'OK' in curResult.split(":")[2]:
-                finalResult += "Test Plex notice sent successfully to " + urllib.unquote_plus(curHost)
+
+        if server_host:
+            if notifiers.plex_notifier.test_server_connection(urllib.unquote_plus(server_host)):
+                finalResult += "Server: Successfully connected to " + urllib.unquote_plus(server_host)
             else:
-                finalResult += "Test Plex notice failed to " + urllib.unquote_plus(curHost)
-            finalResult += "<br />\n"
+                finalResult += "Server: Failed connecting to " + urllib.unquote_plus(server_host)
+        else:
+            finalResult += "No Plex Media Server IP:Port set, skipping..."
+
+        finalResult += "<br />\n"
+
+        if host:
+            for curHost in [x.strip() for x in host.split(",")]:
+                curResult = notifiers.plex_notifier.test_notify(urllib.unquote_plus(curHost), username, password)
+                if len(curResult.split(":")) > 2 and 'OK' in curResult.split(":")[2]:
+                    finalResult += "Client: Test Plex notice sent successfully to " + urllib.unquote_plus(curHost)
+                else:
+                    finalResult += "Client: Test Plex notice failed to " + urllib.unquote_plus(curHost)
+                finalResult += "<br />\n"
+        else:
+            finalResult += "No Plex Client IP:Port set, skipping.<br />\n"
 
         return finalResult
 
@@ -2300,12 +2321,14 @@ class Home:
             epCounts[curEpCat] += 1
 
         def titler(x):
-            if not x:
+            if not x or sickbeard.SORT_ARTICLE:
                 return x
             if x.lower().startswith('a '):
-                    x = x[2:]
+                x = x[2:]
+            elif x.lower().startswith('an '):
+                x = x[3:]
             elif x.lower().startswith('the '):
-                    x = x[4:]
+                x = x[4:]
             return x
         t.sortedShowList = sorted(sickbeard.showList, lambda x, y: cmp(titler(x.name), titler(y.name)))
 
@@ -2352,8 +2375,6 @@ class Home:
         else:
             flatten_folders = 0
 
-        logger.log(u"flatten folders: "+str(flatten_folders))
-
         if paused == "on":
             paused = 1
         else:
@@ -2388,6 +2409,7 @@ class Home:
 
             # reversed for now
             if bool(showObj.flatten_folders) != bool(flatten_folders):
+                logger.log(u"flatten folders: "+str(flatten_folders))
                 showObj.flatten_folders = flatten_folders
                 try:
                     sickbeard.showQueueScheduler.action.refreshShow(showObj) #@UndefinedVariable

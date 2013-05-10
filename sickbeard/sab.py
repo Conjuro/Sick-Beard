@@ -78,7 +78,7 @@ def sendNZB(nzb):
 
     url = sickbeard.SAB_HOST + "api?" + urllib.urlencode(params)
 
-    logger.log(u"Sending NZB to SABnzbd")
+    logger.log(u"Sending NZB to SABnzbd: %s" % nzb.name)
     logger.log(u"URL: " + url, logger.DEBUG)
 
     try:
