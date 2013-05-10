@@ -40,6 +40,7 @@ from sickbeard import encodingKludge as ek
 from sickbeard import search_queue
 from sickbeard import image_cache
 from sickbeard import naming
+from sickbeard import failed_history
 
 from sickbeard.providers import newznab
 from sickbeard.common import Quality, Overview, statusStrings
@@ -150,6 +151,7 @@ ManageMenu = [
     { 'title': 'Backlog Overview',          'path': 'manage/backlogOverview' },
     { 'title': 'Manage Searches',           'path': 'manage/manageSearches'  },
     { 'title': 'Episode Status Management', 'path': 'manage/episodeStatuses' },
+    { 'title': 'Failed Downloads',          'path': 'manage/failedDownloads' },
 ]
 
 class ManageSearches:
@@ -569,6 +571,34 @@ class Manage:
 
         redirect("/manage")
 
+    @cherrypy.expose
+    def failedDownloads(self, limit=100, toRemove=None, add=None):
+
+        myDB = db.DBConnection("failed.db")
+
+        if toRemove != None:
+            toRemove = toRemove.split("|")
+        else:
+            toRemove = []
+
+        if add != None and not myDB.select("SELECT * FROM failed WHERE release = ?", [failed_history.prepareFailedName(add)]):
+            failed_history.logFailed(add)
+
+        for release in toRemove:
+            myDB.action('DELETE FROM failed WHERE release = ?', [release])
+
+        if limit == "0":
+            sqlResults = myDB.select("SELECT * FROM failed")
+        else:
+            sqlResults = myDB.select("SELECT * FROM failed LIMIT ?", [limit])
+
+        t = PageTemplate(file="manage_failedDownloads.tmpl")
+        t.failedResults = sqlResults
+        t.limit = limit
+        t.submenu = ManageMenu
+
+        return _munge(t)
+
 
 class History:
 
@@ -849,7 +879,7 @@ class ConfigPostProcessing:
     def savePostProcessing(self, naming_pattern=None, naming_multi_ep=None,
                     xbmc_data=None, mediabrowser_data=None, synology_data=None, sony_ps3_data=None, wdtv_data=None, tivo_data=None,
                     use_banner=None, keep_processed_dir=None, process_automatically=None, rename_episodes=None,
-                    move_associated_files=None, tv_download_dir=None, naming_custom_abd=None, naming_abd_pattern=None):
+                    move_associated_files=None, tv_download_dir=None, naming_custom_abd=None, naming_abd_pattern=None, delete_failed=None):
 
         results = []
 
@@ -886,11 +916,17 @@ class ConfigPostProcessing:
         else:
             naming_custom_abd = 0
 
+        if delete_failed == "on":
+            delete_failed = 1
+        else:
+            delete_failed = 0
+
         sickbeard.PROCESS_AUTOMATICALLY = process_automatically
         sickbeard.KEEP_PROCESSED_DIR = keep_processed_dir
         sickbeard.RENAME_EPISODES = rename_episodes
         sickbeard.MOVE_ASSOCIATED_FILES = move_associated_files
         sickbeard.NAMING_CUSTOM_ABD = naming_custom_abd
+        sickbeard.DELETE_FAILED = delete_failed
 
         sickbeard.metadata_provider_dict['XBMC'].set_config(xbmc_data)
         sickbeard.metadata_provider_dict['MediaBrowser'].set_config(mediabrowser_data)
@@ -1503,12 +1539,17 @@ class HomePostProcess:
         return _munge(t)
 
     @cherrypy.expose
-    def processEpisode(self, dir=None, nzbName=None, jobName=None, quiet=None):
+    def processEpisode(self, dirName=None, nzbName=None, jobName=None, quiet=None, failed="0"):
 
-        if not dir:
+        if failed == "0":
+            failed = False
+        else:
+            failed = True
+
+        if not dirName:
             redirect("/home/postprocess")
         else:
-            result = processTV.processDir(dir, nzbName)
+            result = processTV.processDir(dirName, nzbName, failed=failed)
             if quiet != None and int(quiet) == 1:
                 return result
 
@@ -1546,7 +1587,7 @@ class NewHomeAddShows:
         if not lang or lang == 'null':
                 lang = "en"
 
-        baseURL = "http://www.thetvdb.com/api/GetSeries.php?"
+        baseURL = "http://thetvdb.com/api/GetSeries.php?"
         nameUTF8 = name.encode('utf-8')
 
         logger.log(u"Trying to find Show on thetvdb.com with: " + nameUTF8.decode('utf-8'), logger.DEBUG)
@@ -2721,6 +2762,7 @@ class Home:
 
         return json.dumps({'result': 'failure'})
 
+
 class UI:
 
     @cherrypy.expose
@@ -2736,7 +2778,7 @@ class UI:
         messages = {}
         cur_notification_num = 1
         for cur_notification in ui.notifications.get_notifications():
-            messages['notification-'+str(cur_notification_num)] = {'title': cur_notification.title,
+            messages['notification-' + str(cur_notification_num)] = {'title': cur_notification.title,
                                                                    'message': cur_notification.message,
                                                                    'type': cur_notification.type}
             cur_notification_num += 1
@@ -2745,6 +2787,12 @@ class UI:
 
 
 class WebInterface:
+
+    @cherrypy.expose
+    def robots_txt(self):
+        """ Keep web crawlers out """
+        cherrypy.response.headers['Content-Type'] = 'text/plain'
+        return 'User-agent: *\nDisallow: /\n'
 
     @cherrypy.expose
     def index(self):
